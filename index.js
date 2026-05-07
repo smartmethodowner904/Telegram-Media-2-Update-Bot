@@ -16,20 +16,18 @@ bot.start(async (ctx) => {
     return ctx.reply(
 `✅ Welcome!
 
-🇧🇩 বাংলায়:
-আপনি এখন বট ব্যবহার করতে পারবেন।
-TikTok / Facebook ভিডিও লিংক পাঠান 📥
+🇧🇩 আপনি এখন ভিডিও ডাউনলোড করতে পারবেন।
+TikTok / Facebook / YouTube link পাঠান 📥
 
-🇬🇧 English:
-Send TikTok or Facebook link to download video 📥`
+🇬🇧 Send TikTok / Facebook / YouTube link`
     );
   }
 
   return ctx.reply(
-    "👋 Welcome!\n\nPlease join our channels to use the bot:",
+    "👋 Welcome!\n\nPlease join our channels:",
     Markup.inlineKeyboard([
-      [Markup.button.url("🌍 Global Channel", "https://t.me/Global_Method_Channel")],
-      [Markup.button.url("🆘 Support Owner", "https://t.me/Smart_Method_Owner")],
+      [Markup.button.url("🌍 Channel", "https://t.me/Global_Method_Channel")],
+      [Markup.button.url("🆘 Support", "https://t.me/Smart_Method_Owner")],
       [Markup.button.callback("✅ I Joined", "joined_check")]
     ])
   );
@@ -39,19 +37,10 @@ Send TikTok or Facebook link to download video 📥`
 bot.action("joined_check", (ctx) => {
   users.set(ctx.from.id, "joined");
 
-  return ctx.reply(
-`✅ Welcome!
-
-🇧🇩 বাংলায়:
-আপনি এখন বট ব্যবহার করতে পারবেন।
-TikTok / Facebook ভিডিও লিংক পাঠান 📥
-
-🇬🇧 English:
-Send TikTok or Facebook link to download video 📥`
-  );
+  return ctx.reply("✅ Now send TikTok / Facebook / YouTube link 📥");
 });
 
-/* ================= TIKTOK API ================= */
+/* ================= TIKTOK ================= */
 async function getTikTok(url) {
   try {
     const api = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`;
@@ -64,29 +53,59 @@ async function getTikTok(url) {
       };
     }
     return null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
-/* ================= FACEBOOK API ================= */
+/* ================= FACEBOOK ================= */
 async function getFacebook(url) {
   try {
-    const api = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`;
+    const api = `https://api.tikmate.app/api/lookup?url=${encodeURIComponent(url)}`;
     const res = await axios.get(api);
 
-    if (res?.data?.data?.play) {
-      return {
-        video: res.data.data.play
-      };
+    if (res?.data?.download_url) {
+      return { video: res.data.download_url };
     }
+
+    // fallback
+    const api2 = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`;
+    const res2 = await axios.get(api2);
+
+    if (res2?.data?.data?.play) {
+      return { video: res2.data.data.play };
+    }
+
     return null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
-/* ================= MESSAGE HANDLER ================= */
+/* ================= YOUTUBE ================= */
+async function getYouTube(url) {
+  try {
+    // working public API
+    const api = `https://api.cobalt.tools/api/json`;
+
+    const res = await axios.post(api, {
+      url: url,
+      vCodec: "h264",
+      vQuality: "720"
+    });
+
+    if (res?.data?.url) {
+      return { video: res.data.url };
+    }
+
+    return null;
+  } catch (err) {
+    console.log("YT error:", err.message);
+    return null;
+  }
+}
+
+/* ================= MESSAGE ================= */
 bot.on("text", async (ctx) => {
   const id = ctx.from.id;
   const url = ctx.message.text;
@@ -99,26 +118,37 @@ bot.on("text", async (ctx) => {
 
   /* ================= FACEBOOK ================= */
   if (url.includes("facebook.com") || url.includes("fb.watch")) {
-
     ctx.reply("⏳ Downloading Facebook video...");
 
     const data = await getFacebook(url);
 
     if (!data?.video) {
-      return ctx.reply("❌ Facebook video download failed!");
+      return ctx.reply("❌ Facebook download failed!");
     }
 
-    return ctx.replyWithVideo(
-      { url: data.video },
-      {
-        caption: "📥 Facebook Video Downloaded Successfully!"
-      }
-    );
+    return ctx.replyWithVideo({ url: data.video }, {
+      caption: "📥 Facebook video downloaded!"
+    });
+  }
+
+  /* ================= YOUTUBE ================= */
+  if (url.includes("youtube.com") || url.includes("youtu.be")) {
+    ctx.reply("⏳ Downloading YouTube video...");
+
+    const data = await getYouTube(url);
+
+    if (!data?.video) {
+      return ctx.reply("❌ YouTube download failed!");
+    }
+
+    return ctx.replyWithVideo({ url: data.video }, {
+      caption: "📥 YouTube video downloaded!"
+    });
   }
 
   /* ================= TIKTOK ================= */
   if (!url.includes("tiktok.com")) {
-    return ctx.reply("❌ Please send valid TikTok or Facebook link!");
+    return ctx.reply("❌ Send TikTok / Facebook / YouTube link!");
   }
 
   ctx.reply("⏳ Downloading TikTok video...");
@@ -126,7 +156,7 @@ bot.on("text", async (ctx) => {
   const data = await getTikTok(url);
 
   if (!data?.video) {
-    return ctx.reply("❌ Failed to download video!");
+    return ctx.reply("❌ TikTok download failed!");
   }
 
   userVideos.set(id, data);
@@ -134,12 +164,10 @@ bot.on("text", async (ctx) => {
   return ctx.replyWithVideo(
     { url: data.video },
     {
-      caption:
-        "📥 Download Completed!\n🎬 Video ready to save\n\n🎧 Click button for MP3",
+      caption: "📥 Download completed",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🟢 Support", url: "https://t.me/Smart_Method_Owner" }],
-          [{ text: "🎧 Get MP3", callback_data: "get_mp3" }]
+          [{ text: "🎧 MP3", callback_data: "get_mp3" }]
         ]
       }
     }
@@ -154,17 +182,12 @@ bot.action("get_mp3", async (ctx) => {
     return ctx.reply("❌ No audio found!");
   }
 
-  return ctx.replyWithAudio(
-    { url: data.audio },
-    {
-      caption: "🎧 MP3 Downloaded Successfully!"
-    }
-  );
+  return ctx.replyWithAudio({ url: data.audio });
 });
 
 /* ================= ERROR ================= */
-bot.catch((err) => console.log("Bot Error:", err));
+bot.catch((err) => console.log(err));
 
 bot.launch();
 
-console.log("🚀 Bot is running...");
+console.log("🚀 Bot Running...");
