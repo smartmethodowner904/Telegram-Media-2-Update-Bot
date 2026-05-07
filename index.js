@@ -18,17 +18,17 @@ bot.start(async (ctx) => {
 
 🇧🇩 বাংলায়:
 আপনি এখন বট ব্যবহার করতে পারবেন।
-TikTok ভিডিও ডাউনলোড করতে ভিডিও লিংক পাঠান 📥
+TikTok / Facebook ভিডিও লিংক পাঠান 📥
 
 🇬🇧 English:
-You can now use the bot. Send a TikTok link to download video 📥`
+Send TikTok or Facebook link to download video 📥`
     );
   }
 
   return ctx.reply(
     "👋 Welcome!\n\nPlease join our channels to use the bot:",
     Markup.inlineKeyboard([
-      [Markup.button.url("🌍 Global Channel", "https://t.me/MiniDemoUpdate")],
+      [Markup.button.url("🌍 Global Channel", "https://t.me/Global_Method_Channel")],
       [Markup.button.url("🆘 Support Owner", "https://t.me/Smart_Method_Owner")],
       [Markup.button.callback("✅ I Joined", "joined_check")]
     ])
@@ -44,15 +44,15 @@ bot.action("joined_check", (ctx) => {
 
 🇧🇩 বাংলায়:
 আপনি এখন বট ব্যবহার করতে পারবেন।
-TikTok ভিডিও ডাউনলোড করতে ভিডিও লিংক পাঠান 📥
+TikTok / Facebook ভিডিও লিংক পাঠান 📥
 
 🇬🇧 English:
-You can now use the bot. Send a TikTok link to download video 📥`
+Send TikTok or Facebook link to download video 📥`
   );
-}); // ✅ FIXED BRACKET HERE
+});
 
-/* ================= VIDEO API ================= */
-async function getVideo(url) {
+/* ================= TIKTOK API ================= */
+async function getTikTok(url) {
   try {
     const api = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`;
     const res = await axios.get(api);
@@ -63,10 +63,25 @@ async function getVideo(url) {
         audio: res.data.data.music
       };
     }
-
     return null;
   } catch (err) {
-    console.log("Download error:", err.message);
+    return null;
+  }
+}
+
+/* ================= FACEBOOK API ================= */
+async function getFacebook(url) {
+  try {
+    const api = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`;
+    const res = await axios.get(api);
+
+    if (res?.data?.data?.play) {
+      return {
+        video: res.data.data.play
+      };
+    }
+    return null;
+  } catch (err) {
     return null;
   }
 }
@@ -79,16 +94,36 @@ bot.on("text", async (ctx) => {
   if (url.startsWith("/")) return;
 
   if (users.get(id) !== "joined") {
-    return ctx.reply("❌ Please join first and click I Joined button!");
+    return ctx.reply("❌ Please join first!");
   }
 
+  /* ================= FACEBOOK ================= */
+  if (url.includes("facebook.com") || url.includes("fb.watch")) {
+
+    ctx.reply("⏳ Downloading Facebook video...");
+
+    const data = await getFacebook(url);
+
+    if (!data?.video) {
+      return ctx.reply("❌ Facebook video download failed!");
+    }
+
+    return ctx.replyWithVideo(
+      { url: data.video },
+      {
+        caption: "📥 Facebook Video Downloaded Successfully!"
+      }
+    );
+  }
+
+  /* ================= TIKTOK ================= */
   if (!url.includes("tiktok.com")) {
-    return ctx.reply("❌ Please send a valid TikTok link!");
+    return ctx.reply("❌ Please send valid TikTok or Facebook link!");
   }
 
   ctx.reply("⏳ Downloading TikTok video...");
 
-  const data = await getVideo(url);
+  const data = await getTikTok(url);
 
   if (!data?.video) {
     return ctx.reply("❌ Failed to download video!");
@@ -100,12 +135,11 @@ bot.on("text", async (ctx) => {
     { url: data.video },
     {
       caption:
-        "📥 Download Completed Successfully!\n🎬 Your video is ready to watch and save.\n\n🎧 Want only MP3? Click button below",
+        "📥 Download Completed!\n🎬 Video ready to save\n\n🎧 Click button for MP3",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📩 Support ID", url: "https://t.me/Smart_Method_Owner" }],
-          [{ text: "👥 Support Team", url: "https://www.tiktok.com/@mdraju_3m" }],
-          [{ text: "🟢 Need MP3", callback_data: "get_mp3" }]
+          [{ text: "🟢 Support", url: "https://t.me/Smart_Method_Owner" }],
+          [{ text: "🎧 Get MP3", callback_data: "get_mp3" }]
         ]
       }
     }
@@ -117,7 +151,7 @@ bot.action("get_mp3", async (ctx) => {
   const data = userVideos.get(ctx.from.id);
 
   if (!data?.audio) {
-    return ctx.reply("❌ No audio found! Send video again.");
+    return ctx.reply("❌ No audio found!");
   }
 
   return ctx.replyWithAudio(
